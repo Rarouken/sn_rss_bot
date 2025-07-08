@@ -88,7 +88,7 @@ rss_feeds = [
 ]
 
 
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/XXXX/XXXX"  # <- tu wklej swój
+DISCORD_WEBHOOK = "https://discordapp.com/api/webhooks/1392262052742959155/DEQ5zlgo3bdqzFkrLX1OyxyvybmRLnVNqcAQjeDVwt8FtUeXhCodvR6UuUILBdAUGvQi"  # <- tu wklej swój
 
 keywords = [
     "Rosja", "Ukraina", "Polska", "Serbia", "Czechy", "Białoruś",
