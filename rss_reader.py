@@ -91,9 +91,27 @@ rss_feeds = [
 DISCORD_WEBHOOK = "https://discordapp.com/api/webhooks/1392262052742959155/DEQ5zlgo3bdqzFkrLX1OyxyvybmRLnVNqcAQjeDVwt8FtUeXhCodvR6UuUILBdAUGvQi"  # <- tu wklej swój
 
 keywords = [
-    "Rosja", "Ukraina", "Polska", "Serbia", "Czechy", "Białoruś",
-    "NATO", "UE", "konflikt", "dyplomacja", "sojusz", "słowiań"
+    # PL/CZ/RU/UA i inne – polityka
+    "wybory", "prezydent", "premier", "parlament", "rząd", "ustawa", "polityka", "protest", "opozycja",
+    "volby", "prezident", "premiér", "vláda", "zákon", "politika", "protest",
+    "выборы", "президент", "премьер", "парламент", "правительство", "закон", "политика", "протест",
+
+    # geopolityka
+    "NATO", "UE", "Unia Europejska", "ONZ", "ambasador", "dyplomacja", "wojna", "granica",
+    "EU", "OSN", "diplomacie", "válka", "hranice",
+    "ЕС", "ООН", "дипломатия", "война", "граница",
+
+    # religia, kultura
+    "kultura", "religia", "kościół", "cerkiew", "tradycja", "święto",
+    "kultura", "náboženství", "církev", "tradice", "svátek",
+    "культура", "религия", "церковь", "традиция", "праздник",
+
+    # media i prawo
+    "wolność słowa", "dziennikarz", "media", "cenzura", "prawo", "skandal",
+    "svoboda slova", "novinář", "média", "cenzura",
+    "свобода слова", "журналист", "СМИ", "цензура"
 ]
+
 
 def is_relevant(entry):
     content = (entry.title + entry.get("summary", "")).lower()
