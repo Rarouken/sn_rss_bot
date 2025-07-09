@@ -168,6 +168,51 @@ def classify_topic(text):
         return top_label
     return None
 
+# Angielskie labelki + mapping do polskich
+TOPIC_LABELS = [
+    "domestic politics", "foreign policy", "economy", "history", "culture", "society",
+    "security", "war", "diplomacy", "national identity", "media", "slavic integration",
+    "international relations", "conflicts", "law", "local government", "international organizations"
+]
+
+LABEL_MAP = {
+    "domestic politics": "polityka krajowa",
+    "foreign policy": "polityka zagraniczna",
+    "economy": "gospodarka",
+    "history": "historia",
+    "culture": "kultura",
+    "society": "społeczeństwo",
+    "security": "bezpieczeństwo",
+    "war": "wojna",
+    "diplomacy": "dyplomacja",
+    "national identity": "tożsamość narodowa",
+    "media": "media",
+    "slavic integration": "integracja słowiańska",
+    "international relations": "stosunki międzynarodowe",
+    "conflicts": "konflikty",
+    "law": "prawo",
+    "local government": "samorząd",
+    "international organizations": "organizacje międzynarodowe"
+}
+
+def classify_topic(text):
+    # Najpierw tłumaczenie na angielski
+    translated = translate_to_english(text)
+    if translated.startswith("[Google Fallback]"):
+        translated = translated.replace("[Google Fallback] ", "")
+    if translated.startswith("[Translation failed]"):
+        translated = text
+
+    result = hf_classifier(translated, TOPIC_LABELS)
+    top_label = result["labels"][0]
+    top_score = result["scores"][0]
+    print(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
+    # PRÓG ustawiony na 0.3 — możesz testowo zmniejszyć/podnieść wedle uznania
+    if top_score >= 0.3:
+        return LABEL_MAP.get(top_label, top_label)
+    return None
+
+
 def contains_slavic_country(text, tags, source):
     for root in SLAVIC_COUNTRIES:
         if root in text:
