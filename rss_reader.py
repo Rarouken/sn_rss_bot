@@ -114,18 +114,6 @@ def classify_topic(text):
     if top_score >= 0.3:
         return LABEL_MAP.get(top_label, top_label)
     return None
-
-
-def contains_slavic_country(text, tags, source):
-    for root in SLAVIC_COUNTRIES:
-        if root in text:
-            return True
-        if any(root in tag.lower() for tag in tags):
-            return True
-        if root in source.lower():
-            return True
-    return False
-
 # --- Antyduplikaty ---
 ARTICLE_TTL_SECONDS = 3 * 24 * 3600
 SENT_ARTICLES_FILE = "sent_articles.txt"
@@ -161,6 +149,17 @@ def was_sent(article_id):
 def mark_as_sent(article_id):
     with open(SENT_ARTICLES_FILE, "a") as f:
         f.write(f"{article_id} {int(time.time())}\n")
+
+def contains_slavic_country(text, tags, source):
+    for root in SLAVIC_COUNTRIES:
+        if root in text:
+            return True
+        if any(root in tag.lower() for tag in tags):
+            return True
+        if root in source.lower():
+            return True
+    return False
+
 
 # --- Wysyłka do Discorda ---
 def send_to_discord(title, link, summary=None, topic=None):
