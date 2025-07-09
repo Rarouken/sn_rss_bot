@@ -6,31 +6,43 @@ import time
 from transformers import pipeline
 import logging
 import yaml
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-def is_obvious_article(entry, slavic_countries):
-    # sprawdza czy w tytule albo summary jest jedno ze słów kluczowych
+# --- Lista fraz, które wykluczają artykuł ---
+EXCLUDE_KEYWORDS = [
+    # sport
+    "piłka", "football", "soccer", "mecz", "liga", "bramka", "gole", "zwycięstwo", "porażka",
+    "turniej", "wyścig", "kolarz", "sport", "mistrzostwa", "trener", "zawodnik",
+    # wypadki, kraksy
+    "wypadek", "kraksa", "kolizja", "katastrofa", "awaria", "pożar", "zderzenie",
+    # pogoda, natura
+    "pogoda", "prognoza", "deszcz", "śnieg", "upał", "burza", "wiatr",
+    # rozrywka, celebryci
+    "film", "serial", "gwiazda", "celebryta", "aktor", "muzyk", "koncert",
+    # inne zbędne
+    "motoryzacja", "motocykl", "rower", "zwierzę", "pies", "kot", "ogród", "przepis", "kuchnia"
+]
+
+def contains_excluded_keyword(entry, exclude_keywords):
     text = f"{entry.title} {entry.get('summary', '')}".lower()
-    for keyword in slavic_countries:
-        if keyword in text:
-            return True
-    return False
+    return any(keyword in text for keyword in exclude_keywords)
+
+def is_obvious_article(entry, slavic_countries):
+    text = f"{entry.title} {entry.get('summary', '')}".lower()
+    return any(keyword in text for keyword in slavic_countries)
 
 def load_config(path="config.yaml"):
     with open(path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-    return config
+        return yaml.safe_load(f)
 
 config = load_config()
-
 rss_feeds = config["rss_feeds"]
 LT_ENDPOINTS = config["lt_endpoints"]
 DISCORD_WEBHOOK = config["discord_webhook"]
 SLAVIC_COUNTRIES = config["slavic_countries"]
 
 logging.basicConfig(
-    level=logging.INFO,  # Zmień na DEBUG jeśli chcesz więcej szczegółów
+    level=logging.INFO,
     format='[%(asctime)s] %(levelname)s: %(message)s',
     datefmt='%H:%M:%S'
 )
@@ -71,35 +83,37 @@ def translate_to_english(text):
 # --- ML klasyfikacja ---
 hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
-# Angielskie labelki + mapping do polskich
 TOPIC_LABELS = [
-    "domestic politics", "foreign policy", "economy", "history", "culture", "society",
-    "security", "war", "diplomacy", "national identity", "media", "slavic integration",
-    "international relations", "conflicts", "law", "local government", "international organizations"
+    "geopolitics", "international relations", "foreign policy", "security", "war", "diplomacy",
+    "conflicts", "society", "migration", "law", "democracy", "national identity",
+    "culture", "history", "education", "media", "economy", "energy", "technology",
+    "integration", "international organizations"
 ]
-
 LABEL_MAP = {
-    "domestic politics": "polityka krajowa",
+    "geopolitics": "geopolityka",
+    "international relations": "stosunki międzynarodowe",
     "foreign policy": "polityka zagraniczna",
-    "economy": "gospodarka",
-    "history": "historia",
-    "culture": "kultura",
-    "society": "społeczeństwo",
     "security": "bezpieczeństwo",
     "war": "wojna",
     "diplomacy": "dyplomacja",
-    "national identity": "tożsamość narodowa",
-    "media": "media",
-    "slavic integration": "integracja słowiańska",
-    "international relations": "stosunki międzynarodowe",
     "conflicts": "konflikty",
+    "society": "społeczeństwo",
+    "migration": "migracje",
     "law": "prawo",
-    "local government": "samorząd",
-    "international organizations": "organizacje międzynarodowe"
+    "democracy": "demokracja",
+    "national identity": "tożsamość narodowa",
+    "culture": "kultura",
+    "history": "historia",
+    "education": "edukacja",
+    "media": "media",
+    "economy": "gospodarka",
+    "energy": "energia",
+    "technology": "technologia",
+    "integration": "integracja",
+    "international organizations": "organizacje międzynarodowe",
 }
 
 def classify_topic(text):
-    # Najpierw tłumaczenie na angielski
     translated = translate_to_english(text)
     if translated.startswith("[Google Fallback]"):
         translated = translated.replace("[Google Fallback] ", "")
@@ -110,11 +124,10 @@ def classify_topic(text):
     top_label = result["labels"][0]
     top_score = result["scores"][0]
     logger.debug(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
-    # PRÓG ustawiony na 0.3 — możesz testowo zmniejszyć/podnieść wedle uznania
     if top_score >= 0.3:
         return LABEL_MAP.get(top_label, top_label)
     return None
-# --- Antyduplikaty ---
+
 ARTICLE_TTL_SECONDS = 3 * 24 * 3600
 SENT_ARTICLES_FILE = "sent_articles.txt"
 
@@ -160,8 +173,6 @@ def contains_slavic_country(text, tags, source):
             return True
     return False
 
-
-# --- Wysyłka do Discorda ---
 def send_to_discord(title, link, summary=None, topic=None):
     original = f"**{title}**\n{link}\n{summary or ''}"
     to_translate = f"{title}\n{summary or ''}"
@@ -178,7 +189,6 @@ def send_to_discord(title, link, summary=None, topic=None):
     except Exception as e:
         logger.error(f"Błąd Discord webhook: {e}")
 
-# --- Główna pętla ---
 def fetch_single_feed(feed_url):
     try:
         feed = feedparser.parse(feed_url)
@@ -188,7 +198,6 @@ def fetch_single_feed(feed_url):
         return []
 
 def fetch_articles(rss_feeds):
-    """Pobiera wpisy z listy feedów RSS (wielowątkowo)."""
     all_entries = []
     with ThreadPoolExecutor(max_workers=8) as executor:
         future_to_url = {executor.submit(fetch_single_feed, url): url for url in rss_feeds}
@@ -199,7 +208,6 @@ def fetch_articles(rss_feeds):
     return all_entries
 
 def filter_articles(entries):
-    """Filtruje wpisy po kraju Słowian i deduplikacji."""
     filtered = []
     for entry in entries:
         article_id = get_article_id(entry)
@@ -208,34 +216,29 @@ def filter_articles(entries):
         source = entry.get("source", {}).get("title", "") or ""
         if was_sent(article_id):
             continue
+        # Odrzuć niechciane tematy (EXCLUDE_KEYWORDS) – to twój twardy filtr!
+        if contains_excluded_keyword(entry, EXCLUDE_KEYWORDS):
+            logger.debug(f"Odrzucone (keyword): {entry.title}")
+            continue
         if not contains_slavic_country(text, tags, source):
             continue
-        # Nowość: pre-filtracja!
         if is_obvious_article(entry, SLAVIC_COUNTRIES):
-            # Dodajemy do specjalnej listy do natychmiastowego wysłania (bez ML)
-            filtered.append((entry, article_id, True))  # True = nie potrzeba ML
+            filtered.append((entry, article_id, True))
         else:
-            filtered.append((entry, article_id, False)) # False = przejdzie przez ML
+            filtered.append((entry, article_id, False))
     return filtered
 
 def translate_article(entry):
-    """Tłumaczy tytuł i podsumowanie artykułu."""
     to_translate = f"{entry.title}\n{entry.get('summary', '')}"
     translated = translate_to_english(to_translate)
     return translated
 
 def classify_article(translated_text):
-    """Klasyfikuje temat artykułu na podstawie tłumaczenia."""
-    topic = classify_topic(translated_text)
-    return topic
+    return classify_topic(translated_text)
 
 def send_article(entry, translated, topic, dry_run=False):
-    """Wysyła wpis na Discorda lub wyświetla na konsoli (dry run)."""
     if dry_run:
-        logger.info(
-    "--- DRY RUN ---\nTytuł: %s\nTłumaczenie: %s\nTemat: %s\n------",
-    entry.title, translated, topic
-)
+        logger.info("--- DRY RUN ---\nTytuł: %s\nTłumaczenie: %s\nTemat: %s\n------", entry.title, translated, topic)
     else:
         send_to_discord(entry.title, entry.link, entry.get('summary', ''), topic)
 
@@ -247,7 +250,6 @@ def main(dry_run=False):
     filtered = filter_articles(entries)
     for entry, article_id, is_obvious in filtered:
         if is_obvious:
-            # nie klasyfikujemy przez ML — od razu leci na Discorda!
             send_article(entry, translate_article(entry), topic=None, dry_run=dry_run)
         else:
             translated = translate_article(entry)
@@ -260,4 +262,4 @@ def main(dry_run=False):
             mark_article_sent(article_id)
 
 if __name__ == "__main__":
-    main(dry_run=False)  # Zmienisz na False, gdy będziesz pewny działania!
+    main(dry_run=False)
