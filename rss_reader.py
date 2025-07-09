@@ -1,6 +1,13 @@
 import feedparser
 import requests
 
+LT_ENDPOINTS = [
+    "https://libretranslate.com/translate",
+    "https://translate.astian.org/translate",
+    "https://libretranslate.de/translate",
+    "https://translate.argosopentech.com/translate"
+]
+
 rss_feeds = [
     # 📌 Ogólne źródła informacyjne
     "https://www.rmf24.pl/fakty/polska/feed",                # Polska – RMF24
@@ -112,21 +119,54 @@ keywords = [
     "свобода слова", "журналист", "СМИ", "цензура"
 ]
 
+def translate_to_english(text):
+    for url in LT_ENDPOINTS:
+        try:
+            payload = {
+                "q": text,
+                "source": "auto",
+                "target": "en",
+                "format": "text"
+            }
+            response = requests.post(url, data=payload, timeout=8)
+            if response.ok:
+                data = response.json()
+                if 'translatedText' in data and data['translatedText']:
+                    return data['translatedText']
+        except Exception:
+            continue
+    return "[Translation error: all services unavailable]"
+
 
 def is_relevant(entry):
     content = (entry.title + entry.get("summary", "")).lower()
     return any(kw.lower() in content for kw in keywords)
 
-def send_to_discord(title, link):
-    data = {"content": f"**{title}**\n{link}"}
+def send_to_discord(title, link, summary=None):
+    # Sklejamy oryginalny post
+    original = f"**{title}**\n{link}\n{summary or ''}"
+
+    # Tekst do tłumaczenia = tytuł + summary
+    to_translate = f"{title}\n{summary or ''}"
+
+    # Tłumaczymy
+    translated = translate_to_english(to_translate)
+
+    # Sklejamy wiadomość: oryginał po lewej, tłumaczenie po prawej (blokowo, czytelnie)
+    content = (
+        f"**Oryginał:**\n{original}\n\n"
+        f"**🇬🇧 Tłumaczenie:**\n{translated}"
+    )
+    data = {"content": content}
     requests.post(DISCORD_WEBHOOK, json=data)
+
 
 def fetch_and_filter():
     for feed_url in rss_feeds:
         feed = feedparser.parse(feed_url)
         for entry in feed.entries:
             if is_relevant(entry):
-                send_to_discord(entry.title, entry.link)
+                send_to_discord(entry.title, entry.link, entry.get("summary", ""))
 
 if __name__ == "__main__":
     fetch_and_filter()
