@@ -3,7 +3,6 @@ import requests
 import hashlib
 import os
 import time
-from transformers import pipeline
 
 SLAVIC_COUNTRIES = [
     # Polska
@@ -254,56 +253,68 @@ def send_to_discord(title, link, summary=None, topic=None):
 
 # --- Główna pętla ---
 def fetch_articles(rss_feeds):
-    # Zwraca listę artykułów
+    """Pobiera wszystkie wpisy z listy feedów RSS."""
     all_entries = []
     for feed_url in rss_feeds:
         try:
             feed = feedparser.parse(feed_url)
             all_entries.extend(feed.entries)
         except Exception as e:
-            logger.warning(f"Feed error: {feed_url} ({e})")
+            print(f"[FETCH ERROR] {feed_url}: {e}")
     return all_entries
 
 def filter_articles(entries):
-    # Zwraca tylko artykuły zawierające kraj Słowian + temat
+    """Filtruje wpisy po kraju Słowian i deduplikacji."""
     filtered = []
     for entry in entries:
+        article_id = get_article_id(entry)
         text = f"{entry.title} {entry.get('summary', '')}".lower()
         tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
         source = entry.get("source", {}).get("title", "") or ""
+        if was_sent(article_id):
+            continue
         if not contains_slavic_country(text, tags, source):
             continue
-        filtered.append(entry)
+        filtered.append((entry, article_id))
     return filtered
 
 def translate_article(entry):
-    # Zwraca tytuł, summary oraz tłumaczenia
+    """Tłumaczy tytuł i podsumowanie artykułu."""
     to_translate = f"{entry.title}\n{entry.get('summary', '')}"
     translated = translate_to_english(to_translate)
     return translated
 
-def classify_article(entry, translated_text):
-    # Klasyfikacja na podstawie tłumaczenia
+def classify_article(translated_text):
+    """Klasyfikuje temat artykułu na podstawie tłumaczenia."""
     topic = classify_topic(translated_text)
     return topic
 
 def send_article(entry, translated, topic, dry_run=False):
-    # Wysyłka do Discorda lub print na konsolę
-    ...
+    """Wysyła wpis na Discorda lub wyświetla na konsoli (dry run)."""
+    if dry_run:
+        print("--- DRY RUN ---")
+        print(f"Tytuł: {entry.title}")
+        print(f"Tłumaczenie: {translated}")
+        print(f"Temat: {topic}")
+        print("------")
+    else:
+        send_to_discord(entry.title, entry.link, entry.get('summary', ''), topic)
 
-def main():
+def mark_article_sent(article_id):
+    mark_as_sent(article_id)
+
+def main(dry_run=False):
     entries = fetch_articles(rss_feeds)
     filtered = filter_articles(entries)
-    for entry in filtered:
+    for entry, article_id in filtered:
         translated = translate_article(entry)
-        topic = classify_article(entry, translated)
+        topic = classify_article(translated)
         if not topic:
+            print(f"ODRZUCONE: brak klasyfikacji tematycznej (ML) [{entry.title}]")
             continue
-        send_article(entry, translated, topic, dry_run=False)
+        send_article(entry, translated, topic, dry_run=dry_run)
+        if not dry_run:
+            mark_article_sent(article_id)
 
 if __name__ == "__main__":
-    main()
-
-            
-if __name__ == "__main__":
-    fetch_and_filter()
+    main(dry_run=False)  # Zmienisz na False, gdy będziesz pewny działania!
