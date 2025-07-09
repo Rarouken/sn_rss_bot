@@ -2,7 +2,7 @@ name: RSS Fetch & Translate
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # co 15 minut
+    - cron: '*/30 * * * *'  # co 15 minut
   workflow_dispatch:        # opcjonalnie: uruchom ręcznie
 
 jobs:
