@@ -7,30 +7,32 @@ from transformers import pipeline
 import logging
 import yaml
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from googletrans import Translator as GoogleTranslator
 
-# --- Lista fraz, które wykluczają artykuł ---
+# --- Filtry ---
 EXCLUDE_KEYWORDS = [
-    # sport
-    "piłka", "football", "soccer", "mecz", "liga", "bramka", "gole", "zwycięstwo", "porażka",
-    "turniej", "wyścig", "kolarz", "sport", "mistrzostwa", "trener", "zawodnik",
-    # wypadki, kraksy
-    "wypadek", "kraksa", "kolizja", "katastrofa", "awaria", "pożar", "zderzenie",
-    # pogoda, natura
-    "pogoda", "prognoza", "deszcz", "śnieg", "upał", "burza", "wiatr",
-    # rozrywka, celebryci
-    "film", "serial", "gwiazda", "celebryta", "aktor", "muzyk", "koncert",
-    # inne zbędne
-    "motoryzacja", "motocykl", "rower", "zwierzę", "pies", "kot", "ogród", "przepis", "kuchnia"
+    # Sport, tabloidy, przestępstwa, pogoda, rozrywka itd.
+    "piłka", "football", "soccer", "mecz", "liga", "bramka", "gole", "wyścig",
+    "sport", "mistrzostwa", "trener", "zawodnik", "wypadek", "kraksa", "kolizja",
+    "katastrofa", "pożar", "zderzenie", "pogoda", "prognoza", "deszcz", "śnieg",
+    "upał", "burza", "wiatr", "film", "serial", "gwiazda", "celebryta", "aktor",
+    "muzyk", "koncert", "motoryzacja", "motocykl", "rower", "zwierzę", "pies",
+    "kot", "ogród", "przepis", "kuchnia", "skandal", "plotka", "tajemnica",
+    "afera", "zaginął", "zaginięcie", "pobicie", "bójka", "sprawca", "areszt",
+    "policja", "śledztwo", "tragedia", "dramat", "przestępca", "proces", "wyrok",
+    "włamanie", "oszustwo", "mafia", "rozbój", "kradzież", "ukradł", "złodziej",
+    "napad", "morderstwo", "zabójstwo", "gwałt", "seks", "alkohol", "papierosy",
+    "narkotyki", "romans", "przygoda"
 ]
 
-def contains_excluded_keyword(entry, exclude_keywords):
-    text = f"{entry.title} {entry.get('summary', '')}".lower()
-    return any(keyword in text for keyword in exclude_keywords)
+IMPORTANT_KEYWORDS = [
+    "premier", "prezydent", "parlament", "rząd", "minister", "traktat", "umowa", 
+    "sojusz", "unia europejska", "nato", "ambasador", "wojsko", "dyplomacja",
+    "sejm", "senat", "referendum", "wybory", "ambasada", "bezpieczeństwo",
+    "wojna", "pokój", "konflikt", "sankcje", "konsulat", "prezydium"
+]
 
-def is_obvious_article(entry, slavic_countries):
-    text = f"{entry.title} {entry.get('summary', '')}".lower()
-    return any(keyword in text for keyword in slavic_countries)
-
+# --- Ładowanie konfiguracji ---
 def load_config(path="config.yaml"):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -41,6 +43,7 @@ LT_ENDPOINTS = config["lt_endpoints"]
 DISCORD_WEBHOOK = config["discord_webhook"]
 SLAVIC_COUNTRIES = config["slavic_countries"]
 
+# --- Logging ---
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(levelname)s: %(message)s',
@@ -48,8 +51,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from googletrans import Translator as GoogleTranslator
 google_translator = GoogleTranslator()
+
+def contains_excluded_keyword(entry, exclude_keywords):
+    text = f"{entry.title} {entry.get('summary', '')}".lower()
+    return any(keyword in text for keyword in exclude_keywords)
+
+def contains_important_keyword(entry, important_keywords):
+    text = f"{entry.title} {entry.get('summary', '')}".lower()
+    return any(keyword in text for keyword in important_keywords)
+
+def is_obvious_article(entry, slavic_countries):
+    text = f"{entry.title} {entry.get('summary', '')}".lower()
+    return any(keyword in text for keyword in slavic_countries)
 
 def translate_to_english(text):
     MAX_CHARS = 3500
@@ -84,10 +98,8 @@ def translate_to_english(text):
 hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 TOPIC_LABELS = [
-    "geopolitics", "international relations", "foreign policy", "security", "war", "diplomacy",
-    "conflicts", "society", "migration", "law", "democracy", "national identity",
-    "culture", "history", "education", "media", "economy", "energy", "technology",
-    "integration", "international organizations"
+    "geopolitics", "international relations", "foreign policy", "security", "war",
+    "diplomacy", "conflicts", "integration", "international organizations"
 ]
 LABEL_MAP = {
     "geopolitics": "geopolityka",
@@ -97,20 +109,8 @@ LABEL_MAP = {
     "war": "wojna",
     "diplomacy": "dyplomacja",
     "conflicts": "konflikty",
-    "society": "społeczeństwo",
-    "migration": "migracje",
-    "law": "prawo",
-    "democracy": "demokracja",
-    "national identity": "tożsamość narodowa",
-    "culture": "kultura",
-    "history": "historia",
-    "education": "edukacja",
-    "media": "media",
-    "economy": "gospodarka",
-    "energy": "energia",
-    "technology": "technologia",
     "integration": "integracja",
-    "international organizations": "organizacje międzynarodowe",
+    "international organizations": "organizacje międzynarodowe"
 }
 
 def classify_topic(text):
@@ -119,15 +119,15 @@ def classify_topic(text):
         translated = translated.replace("[Google Fallback] ", "")
     if translated.startswith("[Translation failed]"):
         translated = text
-
     result = hf_classifier(translated, TOPIC_LABELS)
     top_label = result["labels"][0]
     top_score = result["scores"][0]
     logger.debug(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
-    if top_score >= 0.3:
+    if top_score >= 0.5:  # Wyższy próg
         return LABEL_MAP.get(top_label, top_label)
     return None
 
+# --- Antyduplikaty ---
 ARTICLE_TTL_SECONDS = 3 * 24 * 3600
 SENT_ARTICLES_FILE = "sent_articles.txt"
 
@@ -164,15 +164,13 @@ def mark_as_sent(article_id):
         f.write(f"{article_id} {int(time.time())}\n")
 
 def contains_slavic_country(text, tags, source):
-    for root in SLAVIC_COUNTRIES:
-        if root in text:
-            return True
-        if any(root in tag.lower() for tag in tags):
-            return True
-        if root in source.lower():
-            return True
-    return False
+    return (
+        any(root in text for root in SLAVIC_COUNTRIES)
+        or any(root in tag.lower() for tag in tags for root in SLAVIC_COUNTRIES)
+        or any(root in source.lower() for root in SLAVIC_COUNTRIES)
+    )
 
+# --- Wysyłka do Discorda ---
 def send_to_discord(title, link, summary=None, topic=None):
     original = f"**{title}**\n{link}\n{summary or ''}"
     to_translate = f"{title}\n{summary or ''}"
@@ -189,6 +187,7 @@ def send_to_discord(title, link, summary=None, topic=None):
     except Exception as e:
         logger.error(f"Błąd Discord webhook: {e}")
 
+# --- Główna pętla ---
 def fetch_single_feed(feed_url):
     try:
         feed = feedparser.parse(feed_url)
@@ -214,15 +213,19 @@ def filter_articles(entries):
         text = f"{entry.title} {entry.get('summary', '')}".lower()
         tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
         source = entry.get("source", {}).get("title", "") or ""
+
         if was_sent(article_id):
             continue
-        # Odrzuć niechciane tematy (EXCLUDE_KEYWORDS) – to twój twardy filtr!
         if contains_excluded_keyword(entry, EXCLUDE_KEYWORDS):
-            logger.debug(f"Odrzucone (keyword): {entry.title}")
             continue
+        if len(entry.title) < 40 and len(entry.get('summary', '')) < 100:
+            continue  # Odrzucamy bardzo krótkie newsy
         if not contains_slavic_country(text, tags, source):
             continue
-        if is_obvious_article(entry, SLAVIC_COUNTRIES):
+        # Dodatkowy filtr: jeśli ma słowo kluczowe ważności – traktuj jako ważny
+        if contains_important_keyword(entry, IMPORTANT_KEYWORDS):
+            filtered.append((entry, article_id, True))
+        elif is_obvious_article(entry, SLAVIC_COUNTRIES):
             filtered.append((entry, article_id, True))
         else:
             filtered.append((entry, article_id, False))
@@ -234,11 +237,15 @@ def translate_article(entry):
     return translated
 
 def classify_article(translated_text):
-    return classify_topic(translated_text)
+    topic = classify_topic(translated_text)
+    return topic
 
 def send_article(entry, translated, topic, dry_run=False):
     if dry_run:
-        logger.info("--- DRY RUN ---\nTytuł: %s\nTłumaczenie: %s\nTemat: %s\n------", entry.title, translated, topic)
+        logger.info(
+            "--- DRY RUN ---\nTytuł: %s\nTłumaczenie: %s\nTemat: %s\n------",
+            entry.title, translated, topic
+        )
     else:
         send_to_discord(entry.title, entry.link, entry.get('summary', ''), topic)
 
