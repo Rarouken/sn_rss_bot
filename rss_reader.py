@@ -1,5 +1,28 @@
 import feedparser
 import requests
+import re
+
+# Uniwersalne korzenie słów kluczowych (działa międzyjęzykowo)
+KEYWORD_ROOTS = [
+    # Polityka
+    "polit", "prezydent", "premier", "minister", "parlament", "wybor", "ustaw", "rzad", "dyplom", "ambasad",
+    "protest", "opozycj", "koalicj", "demokra", "autokrat", "wolno", "slowa", "prawa", "konstytuc",
+
+    # Gospodarka
+    "ekonom", "gospodar", "handl", "inwest", "PKB", "inflac", "bezroboc", "podat", "ryn", "transport", "bank",
+
+    # Historia
+    "histori", "wojn", "konflikt", "imperi", "reform", "rewolucj", "koloniz", "odrodz", "zwiazk", "ZSRR", "Jugoslaw",
+
+    # Kultura i tożsamość
+    "kultur", "tradycj", "jezyk", "literatur", "film", "sztuk", "muzyk", "zwyczaj", "religi", "identy", "slaw", "narod", "etni"
+]
+
+# Wykluczenia – aby unikać fałszywych trafień
+EXCLUDE_ROOTS = [
+    "sport", "pogod", "promocj", "ogloszen", "lokaln", "wypad", "kryminal", "zdrowi", "turystyk", "kulinar", "moda", "showbiz"
+]
+
 
 LT_ENDPOINTS = [
     "https://libretranslate.com/translate",
@@ -139,8 +162,18 @@ def translate_to_english(text):
 
 
 def is_relevant(entry):
-    content = (entry.title + entry.get("summary", "")).lower()
-    return any(kw.lower() in content for kw in keywords)
+    # Pobranie i oczyszczenie tekstu z HTML
+    text = (entry.title + " " + entry.get("summary", "")).lower()
+    text = re.sub(r'<.*?>', ' ', text)
+
+    # Sprawdzanie obecności słów kluczowych
+    has_keyword = any(root in text for root in KEYWORD_ROOTS)
+
+    # Sprawdzanie obecności wykluczających słów
+    has_exclude = any(root in text for root in EXCLUDE_ROOTS)
+
+    # Wiadomość jest istotna, jeśli zawiera słowo kluczowe i nie zawiera słów wykluczających
+    return has_keyword and not has_exclude
 
 def send_to_discord(title, link, summary=None):
     # Sklejamy oryginalny post
