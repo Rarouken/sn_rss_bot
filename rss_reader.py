@@ -12,36 +12,77 @@ from transformers import pipeline
 
 # Tematy istotne (fragmenty słów)
 KEYWORD_ROOTS = [
+    # Polityka
     "polit", "prezydent", "premier", "minister", "parlament", "wybor", "ustaw", "rzad", "dyplom", "ambasad",
     "protest", "opozycj", "koalicj", "demokra", "autokrat", "wolno", "slowa", "prawa", "konstytuc",
-    "ekonom", "gospodar", "handl", "inwest", "PKB", "inflac", "bezroboc", "podat", "ryn", "transport", "bank",
-    "histori", "wojn", "konflikt", "imperi", "reform", "rewolucj", "koloniz", "odrodz", "zwiazk", "ZSRR", "Jugoslaw",
-    "kultur", "tradycj", "jezyk", "literatur", "film", "sztuk", "muzyk", "zwyczaj", "religi", "identy", "slaw", "narod", "etni"
+    "rząd", "gover", "law", "president", "prime minist", "minist", "cabinet", "senat", "sejm", "rada", "parliament",
+    # Gospodarka
+    "ekonom", "gospodar", "handl", "inwest", "pib", "PKB", "inflac", "bezroboc", "podat", "ryn", "bank", "giełd", "zysk", "strata",
+    "export", "import", "trade", "finance", "investment", "budget", "subsidy", "unemployment", "inflation",
+    # Bezpieczeństwo i wojsko
+    "bezpiecz", "milit", "wojs", "armia", "nato", "army", "defence", "security", "wojna", "inwazj", "agresj", "obrona", "układ", "pakt",
+    "border", "granica", "warfare", "mobilizacj", "military", "police", "służb", "intelligence", "spy", "espionage",
+    # Historia
+    "histori", "wojn", "konflikt", "imperi", "reform", "rewolucj", "koloniz", "odrodz", "zwiazk", "ZSRR", "Jugoslaw", "collapse", "partition",
+    # Kultura, media, tożsamość
+    "kultur", "tradycj", "jezyk", "literatur", "film", "sztuk", "muzyk", "zwyczaj", "religi", "identy", "narod", "etni", "heritage",
+    "media", "journalism", "press", "propaganda", "disinfo", "fake news", "identity", "diaspora", "slaw", "slav",
+    # Społeczeństwo i ruchy społeczne
+    "społecz", "mniejszość", "protest", "uchodźc", "emigrac", "refugee", "minority", "civil", "ngo", "stowarzyszen",
+    # Międzynarodowe/region
+    "ue", "unii europej", "european union", "usa", "chiny", "chin", "usa", "usa", "united states", "germany", "niemc", "rząd", "administracj",
+    "stosunki", "relacje", "diplomatic", "dyplom", "ambasador", "embassy", "delegation", "organi", "osce", "un", "onzet", "europarl", "parlament europejski"
 ]
+
 
 # Wykluczane tematy
 EXCLUDE_ROOTS = [
-    "sport", "pogod", "promocj", "ogloszen", "lokaln", "wypad", "kryminal", "zdrowi", "turystyk", "kulinar", "moda", "showbiz"
+    "sport", "football", "soccer", "basketball", "hockey", "volleyball", "olympic", "mecz", "liga", "turniej",
+    "pogod", "klimat", "temperatur", "meteorolog", "prognoza", "deszcz", "śnieg",
+    "promocj", "ogloszen", "lokaln", "wypad", "accident", "zderzen", "tragedi", "pozar", "fire", "katastrof", "zdrowi", "health", "medical", "turystyk", "tourism", "hotel",
+    "kulinar", "moda", "fashion", "showbiz", "celebrity", "celebryta", "rozrywka", "entertainment"
 ]
 
 # Fragmenty nazw krajów słowiańskich (PL, EN, lokalne, cyrylica)
 SLAVIC_COUNTRIES = [
-    "polsk", "poland", "polska",
-    "czesk", "czech", "ceska", "češk", "cesko",
-    "słowac", "slovak", "slovensko", "slovakia",
-    "słowe", "sloven", "slovenija", "slovenia",
-    "chorwac", "croat", "hrvatska", "croatia",
-    "serb", "serbia", "srbija",
-    "czarnogór", "montenegro", "crna gora",
-    "macedon", "makedon", "macedonia", "severna makedonija", "north macedonia",
-    "bośni", "bosni", "bosnia", "hercegow", "hercegov", "herzegovina",
-    "bułgar", "bulgar", "bulgaria", "balgariya",
-    "białoru", "białor", "belarus", "bielarus", "belarusia",
-    "rosj", "russia", "rossiya", "россия",
-    "ukrain", "ukraine", "ukraina",
-    "slav", "slaw", "słowian", "slavs", "slavyane", "словян", "славян", "slowian",
-    "bałkan", "balkan", "балкан"
+    # POLSKA
+    "polsk", "polska", "poland", "pl", "warszaw", "warsaw",
+    # CZECHY
+    "czech", "czesk", "czechy", "cesko", "ceská", "ceská republika", "cz", "praga", "prague", "praha",
+    # SŁOWACJA
+    "slovak", "słowac", "slovakia", "slovensko", "sk", "bratislava",
+    # SŁOWENIA
+    "sloven", "sloveni", "slovenia", "slovenija", "si", "ljubljana",
+    # CHORWACJA
+    "chorwat", "chorwac", "croatia", "hrvatska", "hr", "zagreb",
+    # SERBIA
+    "serb", "serbia", "srbija", "rs", "belgrad", "belgrade",
+    # CZARNOGÓRA
+    "czarnogóra", "montenegro", "crna gora", "me", "podgorica",
+    # MACEDONIA PÓŁNOCNA
+    "macedon", "macedonia", "north macedonia", "severna makedonija", "mk", "skopje",
+    # BOŚNIA I HERCEGOWINA
+    "bosnia", "bośnia", "bosniak", "hercegowina", "hercegovina", "ba", "sarajewo", "sarajevo",
+    # BUŁGARIA
+    "bułgar", "bulgar", "bulgaria", "balgariya", "bg", "sofia",
+    # BIAŁORUŚ
+    "białoruś", "białor", "belarus", "bielarus", "by", "minsk", "мінск", "минск",
+    # ROSJA
+    "rosja", "rosyjski", "russia", "rossiya", "ru", "moskwa", "moscow", "москва",
+    # UKRAINA
+    "ukraina", "ukrain", "ukraine", "ua", "kijów", "kyiv", "kievan", "київ", "киев", "київ",
+    # OGÓLNO-SŁOWIAŃSKIE
+    "slavic", "slawic", "slaw", "slav", "słowian", "słowiańsk", "slavs", "slavyane", "slavianski", "słowianie",
+    "славян", "словян", "слов'ян", "славянский", "slovenstvo", "slavonic",
+    # REGIONY/SKRÓTY/SYNONIMY
+    "east europe", "central europe", "cee", "see", "balkan", "bałkan", "балкан", "balkans",
+    "visegrad", "grupa wyszehradzka", "visegrad group", "visegrad four", "v4",
+    "wschodnia europa", "środkowa europa", "eastern bloc", "former soviet", "post-soviet", "eurasia", "eurazja", "eurasian",
+    # DODATKOWE
+    "eurazjatycki", "europejski wschód", "східна європа", "восточная европа", "центральная европа",
+    "адриатика", "adriatic", "adriatycki", "półwysep bałkański", "balkan peninsula"
 ]
+
 
 # =============================== #
 # RSS FEEDS
