@@ -168,7 +168,9 @@ def send_to_discord(title, link, summary=None):
         f"**Oryginał:**\n{original}\n\n"
         f"**🇬🇧 Tłumaczenie:**\n{translated}"
     )
-        data = {"content": content}
+
+    data = {"content": content}  # <- poprawione wcięcie
+
     try:
         requests.post(DISCORD_WEBHOOK, json=data)
     except Exception as e:
