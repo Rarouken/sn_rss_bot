@@ -163,16 +163,36 @@ from transformers import pipeline
 
 hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
-TOPIC_LABELS = ["polityka", "gospodarka", "historia", "kultura"]
+TOPIC_LABELS = [
+    "polityka krajowa",
+    "polityka zagraniczna",
+    "gospodarka",
+    "historia",
+    "kultura",
+    "społeczeństwo",
+    "bezpieczeństwo",
+    "wojna",
+    "dyplomacja",
+    "tożsamość narodowa",
+    "media",
+    "integracja słowiańska",
+    "stosunki międzynarodowe",
+    "konflikty",
+    "prawo",
+    "samorząd",
+    "organizacje międzynarodowe"
+]
 
 def classify_topic(text):
     result = hf_classifier(text, TOPIC_LABELS)
     top_label = result["labels"][0]
     top_score = result["scores"][0]
-    if top_score > 0.75:
-        return top_label  # np. "polityka"
-    return None
 
+    print(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {text[:80]}")
+
+    if top_score >= 0.6:
+        return top_label
+    return None
 
 def is_relevant(entry):
     # Pobranie i oczyszczenie tekstu z HTML
