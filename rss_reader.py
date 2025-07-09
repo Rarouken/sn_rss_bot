@@ -98,8 +98,12 @@ def translate_to_english(text):
 hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 TOPIC_LABELS = [
-    "geopolitics", "international relations", "foreign policy", "security", "war",
-    "diplomacy", "conflicts", "integration", "international organizations"
+    "high politics: government, parliament, president, prime minister, new laws, reforms, international relations",
+    "diplomacy: embassies, treaties, international visits, diplomatic conflicts",
+    "security: military, defense, army, security services, NATO, threats, war",
+    "economy: macroeconomics, government budgets, international trade, energy, major investments",
+    "slavic culture: major Slavic cultural events, language, pan-Slavic initiatives, state-level culture",
+    "irrelevant: sports, minor accidents, local news, showbiz, entertainment, weather, crime"
 ]
 LABEL_MAP = {
     "geopolitics": "geopolityka",
@@ -115,17 +119,12 @@ LABEL_MAP = {
 
 def classify_topic(text):
     translated = translate_to_english(text)
-    if translated.startswith("[Google Fallback]"):
-        translated = translated.replace("[Google Fallback] ", "")
-    if translated.startswith("[Translation failed]"):
-        translated = text
     result = hf_classifier(translated, TOPIC_LABELS)
     top_label = result["labels"][0]
     top_score = result["scores"][0]
-    logger.debug(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
-    if top_score >= 0.5:  # Wyższy próg
-        return LABEL_MAP.get(top_label, top_label)
-    return None
+    if "irrelevant" in top_label or top_score < 0.6:  # Podnieś próg do 0.6
+        return None
+    return top_label.split(":")[0]
 
 # --- Antyduplikaty ---
 ARTICLE_TTL_SECONDS = 3 * 24 * 3600
@@ -213,22 +212,28 @@ def filter_articles(entries):
         text = f"{entry.title} {entry.get('summary', '')}".lower()
         tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
         source = entry.get("source", {}).get("title", "") or ""
-
         if was_sent(article_id):
             continue
         if contains_excluded_keyword(entry, EXCLUDE_KEYWORDS):
             continue
         if len(entry.title) < 40 and len(entry.get('summary', '')) < 100:
-            continue  # Odrzucamy bardzo krótkie newsy
+            continue
         if not contains_slavic_country(text, tags, source):
             continue
-        # Dodatkowy filtr: jeśli ma słowo kluczowe ważności – traktuj jako ważny
-        if contains_important_keyword(entry, IMPORTANT_KEYWORDS):
-            filtered.append((entry, article_id, True))
-        elif is_obvious_article(entry, SLAVIC_COUNTRIES):
-            filtered.append((entry, article_id, True))
+
+        # Nowy warunek: ważne słowo kluczowe LUB klasyfikacja ML
+        ml_ok = False
+        if not (contains_important_keyword(entry, IMPORTANT_KEYWORDS) or is_obvious_article(entry, SLAVIC_COUNTRIES)):
+            translated = translate_article(entry)
+            topic = classify_topic(translated)
+            if topic is not None:
+                ml_ok = True
         else:
-            filtered.append((entry, article_id, False))
+            ml_ok = True
+            topic = None
+
+        if ml_ok:
+            filtered.append((entry, article_id, topic))
     return filtered
 
 def translate_article(entry):
