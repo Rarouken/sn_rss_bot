@@ -39,7 +39,7 @@ KEYWORD_ROOTS = [
 EXCLUDE_ROOTS = [
     "sport", "football", "soccer", "basketball", "hockey", "volleyball", "olympic", "mecz", "liga", "turniej",
     "pogod", "klimat", "temperatur", "meteorolog", "prognoza", "deszcz", "śnieg",
-    "promocj", "ogloszen", "lokaln", "wypad", "accident", "zderzen", "tragedi", "pozar", "fire", "katastrof", "zdrowi", "health", "medical", "turystyk", "tourism", "hotel",
+    "promocj", "ogloszen", "lokaln", "wypad", "accident", "zderzen", "tragedi", "pozar", "fire", "zdrowi", "health", "medical", "hotel",
     "kulinar", "moda", "fashion", "showbiz", "celebrity", "celebryta", "rozrywka", "entertainment"
 ]
 
