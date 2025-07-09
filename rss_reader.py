@@ -159,7 +159,19 @@ def translate_to_english(text):
     first_line = text.split('\n', 1)[0].strip()
     return f"[Translation failed]\nOriginal headline:\n{first_line}"
 
+from transformers import pipeline
 
+hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+TOPIC_LABELS = ["polityka", "gospodarka", "historia", "kultura"]
+
+def classify_topic(text):
+    result = hf_classifier(text, TOPIC_LABELS)
+    top_label = result["labels"][0]
+    top_score = result["scores"][0]
+    if top_score > 0.75:
+        return top_label  # np. "polityka"
+    return None
 
 
 def is_relevant(entry):
@@ -222,7 +234,7 @@ def mark_as_sent(article_id):
     with open(SENT_ARTICLES_FILE, "a") as f:
         f.write(f"{article_id} {int(time.time())}\n")
 
-def send_to_discord(title, link, summary=None):
+def send_to_discord(title, link, summary=None, topic=None):
     # Sklejamy oryginalny post
     original = f"**{title}**\n{link}\n{summary or ''}"
 
@@ -232,18 +244,23 @@ def send_to_discord(title, link, summary=None):
     # Tłumaczymy
     translated = translate_to_english(to_translate)
 
-    # Sklejamy wiadomość: oryginał po lewej, tłumaczenie po prawej (blokowo, czytelnie)
+    # Dodaj temat jeśli istnieje
+    topic_label = f"[**{topic.upper()}**]\n" if topic else ""
+
+    # Sklejamy wiadomość: oryginał + tłumaczenie
     content = (
+        f"{topic_label}"
         f"**Oryginał:**\n{original}\n\n"
         f"**🇬🇧 Tłumaczenie:**\n{translated}"
     )
 
-    data = {"content": content}  # <- poprawione wcięcie
+    data = {"content": content}
 
     try:
         requests.post(DISCORD_WEBHOOK, json=data)
     except Exception as e:
         print(f"Błąd Discord webhook: {e}")
+
 
 
 def fetch_and_filter():
@@ -252,10 +269,14 @@ def fetch_and_filter():
         for entry in feed.entries:
             article_id = get_article_id(entry)
             if was_sent(article_id):
-                continue  # pomijamy, bo już był
+                continue
+
             if is_relevant(entry):
-                send_to_discord(entry.title, entry.link, entry.get("summary", ""))
-                mark_as_sent(article_id)
+                text = f"{entry.title} {entry.get('summary', '')}"
+                topic = classify_topic(text)  # próbujemy przypisać temat
+                if topic:
+                    send_to_discord(entry.title, entry.link, entry.get("summary", ""), topic)
+                    mark_as_sent(article_id)
 
 
 if __name__ == "__main__":
