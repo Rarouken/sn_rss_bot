@@ -144,30 +144,6 @@ def translate_to_english(text):
 # --- ML klasyfikacja ---
 hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
-TOPIC_LABELS = [
-    "polityka krajowa", "polityka zagraniczna", "gospodarka", "historia", "kultura", "społeczeństwo",
-    "bezpieczeństwo", "wojna", "dyplomacja", "tożsamość narodowa", "media", "integracja słowiańska",
-    "stosunki międzynarodowe", "konflikty", "prawo", "samorząd", "organizacje międzynarodowe"
-]
-
-def classify_topic(text):
-    # Najpierw tłumaczenie na angielski
-    translated = translate_to_english(text)
-    # Jeśli Twoja funkcja czasem zwraca [Google Fallback] to wytnij ten fragment:
-    if translated.startswith("[Google Fallback]"):
-        translated = translated.replace("[Google Fallback] ", "")
-    # Jeżeli tłumaczenie się nie udało, użyj oryginału
-    if translated.startswith("[Translation failed]"):
-        translated = text
-
-    result = hf_classifier(translated, TOPIC_LABELS)
-    top_label = result["labels"][0]
-    top_score = result["scores"][0]
-    print(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
-    if top_score >= 0.6:
-        return top_label
-    return None
-
 # Angielskie labelki + mapping do polskich
 TOPIC_LABELS = [
     "domestic politics", "foreign policy", "economy", "history", "culture", "society",
