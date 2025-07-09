@@ -2,7 +2,7 @@
   #    RSS   #
   ############
   
-rss_feeds = [
+rss_feeds
     # 📌 Ogólne źródła informacyjne
     "https://www.rmf24.pl/fakty/polska/feed",                # Polska – RMF24
     "https://rss.onet.pl/",                                 # Polska – Onet
@@ -86,7 +86,7 @@ rss_feeds = [
     "https://www.monitor.si/rss/",                          # Słowenia – Monitor.si
 
     "https://www.imf.org/external/index.xml"                # Globalnie – IMF Publications
-]
+
 
  ############
   # DISCORD  #
@@ -98,21 +98,20 @@ DISCORD_WEBHOOK = "https://discordapp.com/api/webhooks/1392262052742959155/DEQ5z
   # ENDPOINTY#
   ############
   
-LT_ENDPOINTS = [
+LT_ENDPOINTS
     "https://libretranslate.com/translate",
     "https://translate.astian.org/translate",
     "https://libretranslate.de/translate",
     "https://translate.argosopentech.com/translate"
-]
+
 
 
   ############
   # Slavic countries  #
   ############
   
-SLAVIC_COUNTRIES = [
+SLAVIC_COUNTRIES
     # Polska
     "polska", "poland", "pl", "warszawa", "warsaw", "kraków", "krakow", "wrocław", "wroclaw", "gdańsk", "gdansk", "poznan", "poznan", "lodz", "łódź", "szczecin", "katowice", "lubin",
     # Czechy ...
     # ... reszta jak poprzednio
-]
