@@ -1,0 +1,23 @@
+rss_feeds:
+  - https://www.rmf24.pl/fakty/polska/feed
+  - https://rss.onet.pl/
+  - https://gazeta.pl/rss/
+  # ... reszta Twoich feedów
+
+lt_endpoints:
+  - https://libretranslate.com/translate
+  - https://translate.astian.org/translate
+  - https://libretranslate.de/translate
+  - https://translate.argosopentech.com/translate
+
+discord_webhook: "https://discordapp.com/api/webhooks/..."
+
+slavic_countries:
+  - polska
+  - poland
+  - pl
+  - warszawa
+  - warsaw
+  - kraków
+  - krakow
+  # ... reszta jak poprzednio
