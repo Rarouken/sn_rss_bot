@@ -3,6 +3,16 @@ import requests
 import hashlib
 import os
 import time
+from transformers import pipeline
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,  # Zmień na DEBUG jeśli chcesz więcej szczegółów
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 
 SLAVIC_COUNTRIES = [
     # Polska
@@ -181,7 +191,7 @@ def classify_topic(text):
     result = hf_classifier(translated, TOPIC_LABELS)
     top_label = result["labels"][0]
     top_score = result["scores"][0]
-    print(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
+    logger.debug(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
     # PRÓG ustawiony na 0.3 — możesz testowo zmniejszyć/podnieść wedle uznania
     if top_score >= 0.3:
         return LABEL_MAP.get(top_label, top_label)
@@ -249,7 +259,7 @@ def send_to_discord(title, link, summary=None, topic=None):
     try:
         requests.post(DISCORD_WEBHOOK, json=data)
     except Exception as e:
-        print(f"Błąd Discord webhook: {e}")
+        logger.error(f"Błąd Discord webhook: {e}")
 
 # --- Główna pętla ---
 def fetch_articles(rss_feeds):
@@ -260,7 +270,7 @@ def fetch_articles(rss_feeds):
             feed = feedparser.parse(feed_url)
             all_entries.extend(feed.entries)
         except Exception as e:
-            print(f"[FETCH ERROR] {feed_url}: {e}")
+            logger.warning(f"Fetch error: {feed_url}: {e}")
     return all_entries
 
 def filter_articles(entries):
@@ -292,11 +302,10 @@ def classify_article(translated_text):
 def send_article(entry, translated, topic, dry_run=False):
     """Wysyła wpis na Discorda lub wyświetla na konsoli (dry run)."""
     if dry_run:
-        print("--- DRY RUN ---")
-        print(f"Tytuł: {entry.title}")
-        print(f"Tłumaczenie: {translated}")
-        print(f"Temat: {topic}")
-        print("------")
+        logger.info(
+    "--- DRY RUN ---\nTytuł: %s\nTłumaczenie: %s\nTemat: %s\n------",
+    entry.title, translated, topic
+)
     else:
         send_to_discord(entry.title, entry.link, entry.get('summary', ''), topic)
 
@@ -310,7 +319,7 @@ def main(dry_run=False):
         translated = translate_article(entry)
         topic = classify_article(translated)
         if not topic:
-            print(f"ODRZUCONE: brak klasyfikacji tematycznej (ML) [{entry.title}]")
+            logger.info(f"Odrzucone (brak klasyfikacji): {entry.title}")
             continue
         send_article(entry, translated, topic, dry_run=dry_run)
         if not dry_run:
