@@ -151,10 +151,19 @@ TOPIC_LABELS = [
 ]
 
 def classify_topic(text):
-    result = hf_classifier(text, TOPIC_LABELS)
+    # Najpierw tłumaczenie na angielski
+    translated = translate_to_english(text)
+    # Jeśli Twoja funkcja czasem zwraca [Google Fallback] to wytnij ten fragment:
+    if translated.startswith("[Google Fallback]"):
+        translated = translated.replace("[Google Fallback] ", "")
+    # Jeżeli tłumaczenie się nie udało, użyj oryginału
+    if translated.startswith("[Translation failed]"):
+        translated = text
+
+    result = hf_classifier(translated, TOPIC_LABELS)
     top_label = result["labels"][0]
     top_score = result["scores"][0]
-    print(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {text[:80]}")
+    print(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {translated[:80]}")
     if top_score >= 0.6:
         return top_label
     return None
