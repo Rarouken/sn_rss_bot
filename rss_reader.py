@@ -169,8 +169,10 @@ def send_to_discord(title, link, summary=None):
         f"**🇬🇧 Tłumaczenie:**\n{translated}"
     )
     data = {"content": content}
+    try:
     requests.post(DISCORD_WEBHOOK, json=data)
-
+except Exception as e:
+    print(f"Błąd Discord webhook: {e}")
 
 def fetch_and_filter():
     for feed_url in rss_feeds:
