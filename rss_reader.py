@@ -258,16 +258,16 @@ def is_relevant(entry):
     return has_keyword and not has_exclude
 
 # DODAJ TO TU:
-def contains_slavic_country(text, tags, source):
+#def contains_slavic_country(text, tags, source):
     # Szukamy w tekście, tagach i źródle (wszystko na lower)
-    for root in SLAVIC_COUNTRIES:
-        if root in text:
-            return True
-        if any(root in tag.lower() for tag in tags):
-            return True
-        if root in source.lower():
-            return True
-    return False
+ #   for root in SLAVIC_COUNTRIES:
+  #      if root in text:
+   #         return True
+    #    if any(root in tag.lower() for tag in tags):
+     #       return True
+      #  if root in source.lower():
+       #     return True
+    #return False
 
 # =============================== #
 # ANTYDUPLIKATY
@@ -336,19 +336,29 @@ def fetch_and_filter():
             article_id = get_article_id(entry)
             if was_sent(article_id):
                 continue
-            # Przygotuj tekst i tagi
             text = f"{entry.title} {entry.get('summary', '')}".lower()
             tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
             source = entry.get("source", {}).get("title", "") or feed_url
-            # FILTRACJA:
+
+            print("Tytuł:", entry.title)
+            print("Summary:", entry.get("summary", ""))
+            print("Tags:", tags)
+            print("Source:", source)
+            
             if not is_relevant(entry):
+                print("ODRZUCONE: is_relevant (brak kluczowych słów)")
                 continue
             if not contains_slavic_country(text, tags, source):
+                print("ODRZUCONE: contains_slavic_country (brak kraju/miasta Słowian)")
                 continue
             topic = classify_topic(text)
-            if topic:
-                send_to_discord(entry.title, entry.link, entry.get("summary", ""), topic)
-                mark_as_sent(article_id)
+            if not topic:
+                print("ODRZUCONE: brak klasyfikacji tematycznej")
+                continue
+
+            print("→ WYSLANO!")
+            send_to_discord(entry.title, entry.link, entry.get("summary", ""), topic)
+            mark_as_sent(article_id)
 
 if __name__ == "__main__":
     fetch_and_filter()
