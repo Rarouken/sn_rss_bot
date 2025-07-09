@@ -5,6 +5,13 @@ import os
 import time
 from transformers import pipeline
 
+SLAVIC_COUNTRIES = [
+    # Polska
+    "polska", "poland", "pl", "warszawa", "warsaw", "kraków", "krakow", "wrocław", "wroclaw", "gdańsk", "gdansk", "poznan", "poznan", "lodz", "łódź", "szczecin", "katowice", "lubin",
+    # Czechy ...
+    # ... reszta jak poprzednio
+]
+
 # --- Lista RSS-ów ---
 rss_feeds = [
     # 📌 Ogólne źródła informacyjne
