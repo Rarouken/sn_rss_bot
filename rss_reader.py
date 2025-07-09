@@ -46,31 +46,31 @@ EXCLUDE_ROOTS = [
 # Fragmenty nazw krajów słowiańskich (PL, EN, lokalne, cyrylica)
 SLAVIC_COUNTRIES = [
     # POLSKA
-    "polsk", "polska", "poland", "pl", "warszaw", "warsaw",
+    "polsk", "polska", "poland", "pl", "warszawa", "warsaw", "kraków", "krakow", "wrocław", "wroclaw", "gdańsk", "gdansk", "poznan", "poznan",
     # CZECHY
-    "czech", "czesk", "czechy", "cesko", "ceská", "ceská republika", "cz", "praga", "prague", "praha",
+    "czech", "czesk", "czechy", "cesko", "ceská", "ceská republika", "cz", "praga", "prague", "praha", "brno", "ostrava", "plzen", "olomouc",
     # SŁOWACJA
-    "slovak", "słowac", "slovakia", "slovensko", "sk", "bratislava",
+    "slovak", "słowac", "slovakia", "slovensko", "sk", "bratysława", "bratislava", "koszyce", "kosice", "preszów", "presov",
     # SŁOWENIA
-    "sloven", "sloveni", "slovenia", "slovenija", "si", "ljubljana",
+    "sloven", "sloveni", "slovenia", "slovenija", "si", "ljubljana", "maribor", "celje",
     # CHORWACJA
-    "chorwat", "chorwac", "croatia", "hrvatska", "hr", "zagreb",
+    "chorwat", "chorwac", "croatia", "hrvatska", "hr", "zagrzeb", "zagreb", "split", "rijeka", "osijek", "zadar",
     # SERBIA
-    "serb", "serbia", "srbija", "rs", "belgrad", "belgrade",
+    "serb", "serbia", "srbija", "rs", "belgrad", "belgrade", "novi sad", "niš", "nis", "kragujevac",
     # CZARNOGÓRA
-    "czarnogóra", "montenegro", "crna gora", "me", "podgorica",
+    "czarnogóra", "montenegro", "crna gora", "me", "podgorica", "nikšić", "nicsic", "herceg novi",
     # MACEDONIA PÓŁNOCNA
-    "macedon", "macedonia", "north macedonia", "severna makedonija", "mk", "skopje",
+    "macedon", "macedonia", "north macedonia", "severna makedonija", "mk", "skopje", "bitola", "kumanovo", "tetovo",
     # BOŚNIA I HERCEGOWINA
-    "bosnia", "bośnia", "bosniak", "hercegowina", "hercegovina", "ba", "sarajewo", "sarajevo",
+    "bosnia", "bośnia", "bosniak", "hercegowina", "hercegovina", "ba", "sarajewo", "sarajevo", "banja luka", "mostar", "tuzla", "zenica",
     # BUŁGARIA
-    "bułgar", "bulgar", "bulgaria", "balgariya", "bg", "sofia",
+    "bułgar", "bulgar", "bulgaria", "balgariya", "bg", "sofia", "plovdiv", "varna", "burgas", "ruse",
     # BIAŁORUŚ
-    "białoruś", "białor", "belarus", "bielarus", "by", "minsk", "мінск", "минск",
+    "białoruś", "białor", "belarus", "bielarus", "by", "mińsk", "minsk", "homel", "gomel", "hrodna", "groddno", "brest", "vitebsk", "mahiliou", "mogilev",
     # ROSJA
-    "rosja", "rosyjski", "russia", "rossiya", "ru", "moskwa", "moscow", "москва",
+    "rosja", "rosyjski", "russia", "rossiya", "ru", "moskwa", "moscow", "санкт-петербург", "st. petersburg", "petersburg", "nowosybirsk", "novosibirsk", "yekaterinburg", "jekaterynburg", "niżny nowogród", "nizhny novgorod", "kazań", "kazan", "samara", "omska", "omsk", "ufa", "krasnojarsk", "władywostok", "vladivostok",
     # UKRAINA
-    "ukraina", "ukrain", "ukraine", "ua", "kijów", "kyiv", "kievan", "київ", "киев", "київ",
+    "ukraina", "ukrain", "ukraine", "ua", "kijów", "kyiv", "kievan", "київ", "kiyev", "lwów", "lviv", "odesa", "odessa", "charków", "kharkiv", "dniepr", "dnipro", "zaporoże", "zaporizhia", "żytomierz", "zhytomyr", "mikołajów", "mykolaiv", "chmielnicki", "khmelnytskyi",
     # OGÓLNO-SŁOWIAŃSKIE
     "slavic", "slawic", "slaw", "slav", "słowian", "słowiańsk", "slavs", "slavyane", "slavianski", "słowianie",
     "славян", "словян", "слов'ян", "славянский", "slovenstvo", "slavonic",
@@ -82,7 +82,6 @@ SLAVIC_COUNTRIES = [
     "eurazjatycki", "europejski wschód", "східна європа", "восточная европа", "центральная европа",
     "адриатика", "adriatic", "adriatycki", "półwysep bałkański", "balkan peninsula"
 ]
-
 
 # =============================== #
 # RSS FEEDS
