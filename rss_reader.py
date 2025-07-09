@@ -253,33 +253,57 @@ def send_to_discord(title, link, summary=None, topic=None):
         print(f"Błąd Discord webhook: {e}")
 
 # --- Główna pętla ---
-def fetch_and_filter():
+def fetch_articles(rss_feeds):
+    # Zwraca listę artykułów
+    all_entries = []
     for feed_url in rss_feeds:
-        feed = feedparser.parse(feed_url)
-        for entry in feed.entries:
-            article_id = get_article_id(entry)
-            if was_sent(article_id):
-                continue
-            text = f"{entry.title} {entry.get('summary', '')}".lower()
-            tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
-            source = entry.get("source", {}).get("title", "") or feed_url
+        try:
+            feed = feedparser.parse(feed_url)
+            all_entries.extend(feed.entries)
+        except Exception as e:
+            logger.warning(f"Feed error: {feed_url} ({e})")
+    return all_entries
 
-            print("Tytuł:", entry.title)
-            print("Summary:", entry.get("summary", ""))
-            print("Tags:", tags)
-            print("Source:", source)
-            
-            topic = classify_topic(text)
-            if not topic:
-                print("ODRZUCONE: brak klasyfikacji tematycznej przez ML")
-                continue
-            if not contains_slavic_country(text, tags, source):
-                print("ODRZUCONE: contains_slavic_country (brak kraju/miasta Słowian)")
-                continue
+def filter_articles(entries):
+    # Zwraca tylko artykuły zawierające kraj Słowian + temat
+    filtered = []
+    for entry in entries:
+        text = f"{entry.title} {entry.get('summary', '')}".lower()
+        tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
+        source = entry.get("source", {}).get("title", "") or ""
+        if not contains_slavic_country(text, tags, source):
+            continue
+        filtered.append(entry)
+    return filtered
 
-            print("→ WYSLANO!")
-            send_to_discord(entry.title, entry.link, entry.get("summary", ""), topic)
-            mark_as_sent(article_id)
+def translate_article(entry):
+    # Zwraca tytuł, summary oraz tłumaczenia
+    to_translate = f"{entry.title}\n{entry.get('summary', '')}"
+    translated = translate_to_english(to_translate)
+    return translated
+
+def classify_article(entry, translated_text):
+    # Klasyfikacja na podstawie tłumaczenia
+    topic = classify_topic(translated_text)
+    return topic
+
+def send_article(entry, translated, topic, dry_run=False):
+    # Wysyłka do Discorda lub print na konsolę
+    ...
+
+def main():
+    entries = fetch_articles(rss_feeds)
+    filtered = filter_articles(entries)
+    for entry in filtered:
+        translated = translate_article(entry)
+        topic = classify_article(entry, translated)
+        if not topic:
+            continue
+        send_article(entry, translated, topic, dry_run=False)
+
+if __name__ == "__main__":
+    main()
+
             
 if __name__ == "__main__":
     fetch_and_filter()
