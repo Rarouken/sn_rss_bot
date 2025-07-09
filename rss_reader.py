@@ -7,6 +7,8 @@ from transformers import pipeline
 import logging
 import yaml
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 def load_config(path="config.yaml"):
     with open(path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
@@ -170,15 +172,23 @@ def send_to_discord(title, link, summary=None, topic=None):
         logger.error(f"Błąd Discord webhook: {e}")
 
 # --- Główna pętla ---
+def fetch_single_feed(feed_url):
+    try:
+        feed = feedparser.parse(feed_url)
+        return feed.entries
+    except Exception as e:
+        logger.warning(f"Fetch error: {feed_url}: {e}")
+        return []
+
 def fetch_articles(rss_feeds):
-    """Pobiera wszystkie wpisy z listy feedów RSS."""
+    """Pobiera wpisy z listy feedów RSS (wielowątkowo)."""
     all_entries = []
-    for feed_url in rss_feeds:
-        try:
-            feed = feedparser.parse(feed_url)
-            all_entries.extend(feed.entries)
-        except Exception as e:
-            logger.warning(f"Fetch error: {feed_url}: {e}")
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_url = {executor.submit(fetch_single_feed, url): url for url in rss_feeds}
+        for future in as_completed(future_to_url):
+            entries = future.result()
+            all_entries.extend(entries)
+    logger.info(f"Pobrano {len(all_entries)} wpisów z {len(rss_feeds)} kanałów (threaded).")
     return all_entries
 
 def filter_articles(entries):
