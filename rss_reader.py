@@ -178,6 +178,9 @@ def is_relevant(entry):
 
 import hashlib
 import os
+import time
+
+ARTICLE_TTL_SECONDS = 3 * 24 * 3600  # Przechowuj newsy przez 3 dni (możesz zmienić)
 
 SENT_ARTICLES_FILE = "sent_articles.txt"
 
@@ -189,13 +192,35 @@ def get_article_id(entry):
 def was_sent(article_id):
     if not os.path.exists(SENT_ARTICLES_FILE):
         return False
+
+    valid_lines = []
+    now = time.time()
+    found = False
+
     with open(SENT_ARTICLES_FILE, "r") as f:
-        return article_id in f.read().splitlines()
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) != 2:
+                continue
+            existing_id, timestamp = parts
+            try:
+                timestamp = float(timestamp)
+            except ValueError:
+                continue
+
+            if now - timestamp < ARTICLE_TTL_SECONDS:
+                valid_lines.append(f"{existing_id} {int(timestamp)}")
+                if existing_id == article_id:
+                    found = True
+
+    with open(SENT_ARTICLES_FILE, "w") as f:
+        f.write("\n".join(valid_lines) + "\n")
+
+    return found
 
 def mark_as_sent(article_id):
     with open(SENT_ARTICLES_FILE, "a") as f:
-        f.write(article_id + "\n")
-
+        f.write(f"{article_id} {int(time.time())}\n")
 
 def send_to_discord(title, link, summary=None):
     # Sklejamy oryginalny post
@@ -225,8 +250,13 @@ def fetch_and_filter():
     for feed_url in rss_feeds:
         feed = feedparser.parse(feed_url)
         for entry in feed.entries:
+            article_id = get_article_id(entry)
+            if was_sent(article_id):
+                continue  # pomijamy, bo już był
             if is_relevant(entry):
                 send_to_discord(entry.title, entry.link, entry.get("summary", ""))
+                mark_as_sent(article_id)
+
 
 if __name__ == "__main__":
     fetch_and_filter()
