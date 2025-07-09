@@ -120,7 +120,16 @@ rss_feeds = [
 
 DISCORD_WEBHOOK = "https://discordapp.com/api/webhooks/1392262052742959155/DEQ5zlgo3bdqzFkrLX1OyxyvybmRLnVNqcAQjeDVwt8FtUeXhCodvR6UuUILBdAUGvQi"  # <- tu wklej swój
 
+from googletrans import Translator as GoogleTranslator
+google_translator = GoogleTranslator()
+
 def translate_to_english(text):
+    MAX_CHARS = 3500
+
+    if len(text) > MAX_CHARS:
+        text = text[:MAX_CHARS].rsplit(" ", 1)[0] + "..."
+
+    # LibreTranslate próby
     for url in LT_ENDPOINTS:
         try:
             payload = {
@@ -132,11 +141,25 @@ def translate_to_english(text):
             response = requests.post(url, data=payload, timeout=15)
             if response.ok:
                 data = response.json()
-                if 'translatedText' in data and data['translatedText']:
-                    return data['translatedText']
+                translated = data.get("translatedText", "").strip()
+                if translated and translated.lower() != text.lower() and len(translated) > 15:
+                    return translated
         except Exception:
             continue
-    return "[Translation error: all services unavailable]"
+
+    # Google Translate fallback
+    try:
+        translated = google_translator.translate(text, dest='en').text
+        if translated and translated.lower() != text.lower():
+            return f"[Google Fallback] {translated}"
+    except Exception:
+        pass
+
+    # Ostateczny fallback
+    first_line = text.split('\n', 1)[0].strip()
+    return f"[Translation failed]\nOriginal headline:\n{first_line}"
+
+
 
 
 def is_relevant(entry):
