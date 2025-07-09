@@ -256,17 +256,16 @@ def is_relevant(entry):
     # Wiadomość jest istotna, jeśli zawiera słowo kluczowe i nie zawiera słów wykluczających
     return has_keyword and not has_exclude
 
-# DODAJ TO TU:
-#def contains_slavic_country(text, tags, source):
+def contains_slavic_country(text, tags, source):
     # Szukamy w tekście, tagach i źródle (wszystko na lower)
- #   for root in SLAVIC_COUNTRIES:
-  #      if root in text:
-   #         return True
-    #    if any(root in tag.lower() for tag in tags):
-     #       return True
-      #  if root in source.lower():
-       #     return True
-    #return False
+    for root in SLAVIC_COUNTRIES:
+        if root in text:
+            return True
+        if any(root in tag.lower() for tag in tags):
+            return True
+        if root in source.lower():
+            return True
+    return False
 
 # =============================== #
 # ANTYDUPLIKATY
