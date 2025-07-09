@@ -9,6 +9,14 @@ import yaml
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+def is_obvious_article(entry, slavic_countries):
+    # sprawdza czy w tytule albo summary jest jedno ze słów kluczowych
+    text = f"{entry.title} {entry.get('summary', '')}".lower()
+    for keyword in slavic_countries:
+        if keyword in text:
+            return True
+    return False
+
 def load_config(path="config.yaml"):
     with open(path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
@@ -203,7 +211,12 @@ def filter_articles(entries):
             continue
         if not contains_slavic_country(text, tags, source):
             continue
-        filtered.append((entry, article_id))
+        # Nowość: pre-filtracja!
+        if is_obvious_article(entry, SLAVIC_COUNTRIES):
+            # Dodajemy do specjalnej listy do natychmiastowego wysłania (bez ML)
+            filtered.append((entry, article_id, True))  # True = nie potrzeba ML
+        else:
+            filtered.append((entry, article_id, False)) # False = przejdzie przez ML
     return filtered
 
 def translate_article(entry):
@@ -233,13 +246,17 @@ def mark_article_sent(article_id):
 def main(dry_run=False):
     entries = fetch_articles(rss_feeds)
     filtered = filter_articles(entries)
-    for entry, article_id in filtered:
-        translated = translate_article(entry)
-        topic = classify_article(translated)
-        if not topic:
-            logger.info(f"Odrzucone (brak klasyfikacji): {entry.title}")
-            continue
-        send_article(entry, translated, topic, dry_run=dry_run)
+    for entry, article_id, is_obvious in filtered:
+        if is_obvious:
+            # nie klasyfikujemy przez ML — od razu leci na Discorda!
+            send_article(entry, translate_article(entry), topic=None, dry_run=dry_run)
+        else:
+            translated = translate_article(entry)
+            topic = classify_article(translated)
+            if not topic:
+                logger.info(f"Odrzucone (brak klasyfikacji): {entry.title}")
+                continue
+            send_article(entry, translated, topic, dry_run=dry_run)
         if not dry_run:
             mark_article_sent(article_id)
 
