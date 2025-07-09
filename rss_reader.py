@@ -176,6 +176,27 @@ def is_relevant(entry):
     # Wiadomość jest istotna, jeśli zawiera słowo kluczowe i nie zawiera słów wykluczających
     return has_keyword and not has_exclude
 
+import hashlib
+import os
+
+SENT_ARTICLES_FILE = "sent_articles.txt"
+
+def get_article_id(entry):
+    # Identyfikator artykułu (np. hash tytułu + linku)
+    unique_string = (entry.title + entry.link).encode("utf-8")
+    return hashlib.md5(unique_string).hexdigest()
+
+def was_sent(article_id):
+    if not os.path.exists(SENT_ARTICLES_FILE):
+        return False
+    with open(SENT_ARTICLES_FILE, "r") as f:
+        return article_id in f.read().splitlines()
+
+def mark_as_sent(article_id):
+    with open(SENT_ARTICLES_FILE, "a") as f:
+        f.write(article_id + "\n")
+
+
 def send_to_discord(title, link, summary=None):
     # Sklejamy oryginalny post
     original = f"**{title}**\n{link}\n{summary or ''}"
