@@ -1,35 +1,51 @@
 import feedparser
 import requests
 import re
+import hashlib
+import os
+import time
+from transformers import pipeline
 
-# Uniwersalne korzenie słów kluczowych (działa międzyjęzykowo)
+# =============================== #
+# KONFIGURACJA FILTRÓW I KRAJÓW  #
+# =============================== #
+
+# Tematy istotne (fragmenty słów)
 KEYWORD_ROOTS = [
-    # Polityka
     "polit", "prezydent", "premier", "minister", "parlament", "wybor", "ustaw", "rzad", "dyplom", "ambasad",
     "protest", "opozycj", "koalicj", "demokra", "autokrat", "wolno", "slowa", "prawa", "konstytuc",
-
-    # Gospodarka
     "ekonom", "gospodar", "handl", "inwest", "PKB", "inflac", "bezroboc", "podat", "ryn", "transport", "bank",
-
-    # Historia
     "histori", "wojn", "konflikt", "imperi", "reform", "rewolucj", "koloniz", "odrodz", "zwiazk", "ZSRR", "Jugoslaw",
-
-    # Kultura i tożsamość
     "kultur", "tradycj", "jezyk", "literatur", "film", "sztuk", "muzyk", "zwyczaj", "religi", "identy", "slaw", "narod", "etni"
 ]
 
-# Wykluczenia – aby unikać fałszywych trafień
+# Wykluczane tematy
 EXCLUDE_ROOTS = [
     "sport", "pogod", "promocj", "ogloszen", "lokaln", "wypad", "kryminal", "zdrowi", "turystyk", "kulinar", "moda", "showbiz"
 ]
 
-
-LT_ENDPOINTS = [
-    "https://libretranslate.com/translate",
-    "https://translate.astian.org/translate",
-    "https://libretranslate.de/translate",
-    "https://translate.argosopentech.com/translate"
+# Fragmenty nazw krajów słowiańskich (PL, EN, lokalne, cyrylica)
+SLAVIC_COUNTRIES = [
+    "polsk", "poland", "polska",
+    "czesk", "czech", "ceska", "češk", "cesko",
+    "słowac", "slovak", "slovensko", "slovakia",
+    "słowe", "sloven", "slovenija", "slovenia",
+    "chorwac", "croat", "hrvatska", "croatia",
+    "serb", "serbia", "srbija",
+    "czarnogór", "montenegro", "crna gora",
+    "macedon", "makedon", "macedonia", "severna makedonija", "north macedonia",
+    "bośni", "bosni", "bosnia", "hercegow", "hercegov", "herzegovina",
+    "bułgar", "bulgar", "bulgaria", "balgariya",
+    "białoru", "białor", "belarus", "bielarus", "belarusia",
+    "rosj", "russia", "rossiya", "россия",
+    "ukrain", "ukraine", "ukraina",
+    "slav", "slaw", "słowian", "slavs", "slavyane", "словян", "славян", "slowian",
+    "bałkan", "balkan", "балкан"
 ]
+
+# =============================== #
+# RSS FEEDS
+# =============================== #
 
 rss_feeds = [
     # 📌 Ogólne źródła informacyjne
@@ -117,19 +133,29 @@ rss_feeds = [
     "https://www.imf.org/external/index.xml"                # Globalnie – IMF Publications
 ]
 
+# =============================== #
+# DISCORD WEBHOOK
+# =============================== #
 
 DISCORD_WEBHOOK = "https://discordapp.com/api/webhooks/1392262052742959155/DEQ5zlgo3bdqzFkrLX1OyxyvybmRLnVNqcAQjeDVwt8FtUeXhCodvR6UuUILBdAUGvQi"  # <- tu wklej swój
+
+LT_ENDPOINTS = [
+    "https://libretranslate.com/translate",
+    "https://translate.astian.org/translate",
+    "https://libretranslate.de/translate",
+    "https://translate.argosopentech.com/translate"
+]
 
 from googletrans import Translator as GoogleTranslator
 google_translator = GoogleTranslator()
 
+# =============================== #
+# TŁUMACZENIE
+# =============================== #
 def translate_to_english(text):
     MAX_CHARS = 3500
-
     if len(text) > MAX_CHARS:
         text = text[:MAX_CHARS].rsplit(" ", 1)[0] + "..."
-
-    # LibreTranslate próby
     for url in LT_ENDPOINTS:
         try:
             payload = {
@@ -146,50 +172,33 @@ def translate_to_english(text):
                     return translated
         except Exception:
             continue
-
-    # Google Translate fallback
     try:
         translated = google_translator.translate(text, dest='en').text
         if translated and translated.lower() != text.lower():
             return f"[Google Fallback] {translated}"
     except Exception:
         pass
-
-    # Ostateczny fallback
     first_line = text.split('\n', 1)[0].strip()
     return f"[Translation failed]\nOriginal headline:\n{first_line}"
 
 from transformers import pipeline
 
+# =============================== #
+# HUGGINGFACE: KLASYFIKACJA
+# =============================== #
 hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 TOPIC_LABELS = [
-    "polityka krajowa",
-    "polityka zagraniczna",
-    "gospodarka",
-    "historia",
-    "kultura",
-    "społeczeństwo",
-    "bezpieczeństwo",
-    "wojna",
-    "dyplomacja",
-    "tożsamość narodowa",
-    "media",
-    "integracja słowiańska",
-    "stosunki międzynarodowe",
-    "konflikty",
-    "prawo",
-    "samorząd",
-    "organizacje międzynarodowe"
+    "polityka krajowa", "polityka zagraniczna", "gospodarka", "historia", "kultura", "społeczeństwo",
+    "bezpieczeństwo", "wojna", "dyplomacja", "tożsamość narodowa", "media", "integracja słowiańska",
+    "stosunki międzynarodowe", "konflikty", "prawo", "samorząd", "organizacje międzynarodowe"
 ]
 
 def classify_topic(text):
     result = hf_classifier(text, TOPIC_LABELS)
     top_label = result["labels"][0]
     top_score = result["scores"][0]
-
     print(f"[CLASSIFY] → {top_label} ({top_score:.2f}) for text: {text[:80]}")
-
     if top_score >= 0.6:
         return top_label
     return None
@@ -208,27 +217,34 @@ def is_relevant(entry):
     # Wiadomość jest istotna, jeśli zawiera słowo kluczowe i nie zawiera słów wykluczających
     return has_keyword and not has_exclude
 
-import hashlib
-import os
-import time
+# DODAJ TO TU:
+def contains_slavic_country(text, tags, source):
+    # Szukamy w tekście, tagach i źródle (wszystko na lower)
+    for root in SLAVIC_COUNTRIES:
+        if root in text:
+            return True
+        if any(root in tag.lower() for tag in tags):
+            return True
+        if root in source.lower():
+            return True
+    return False
 
-ARTICLE_TTL_SECONDS = 3 * 24 * 3600  # Przechowuj newsy przez 3 dni (możesz zmienić)
-
+# =============================== #
+# ANTYDUPLIKATY
+# =============================== #
+ARTICLE_TTL_SECONDS = 3 * 24 * 3600
 SENT_ARTICLES_FILE = "sent_articles.txt"
 
 def get_article_id(entry):
-    # Identyfikator artykułu (np. hash tytułu + linku)
     unique_string = (entry.title + entry.link).encode("utf-8")
     return hashlib.md5(unique_string).hexdigest()
 
 def was_sent(article_id):
     if not os.path.exists(SENT_ARTICLES_FILE):
         return False
-
     valid_lines = []
     now = time.time()
     found = False
-
     with open(SENT_ARTICLES_FILE, "r") as f:
         for line in f:
             parts = line.strip().split()
@@ -239,50 +255,40 @@ def was_sent(article_id):
                 timestamp = float(timestamp)
             except ValueError:
                 continue
-
             if now - timestamp < ARTICLE_TTL_SECONDS:
                 valid_lines.append(f"{existing_id} {int(timestamp)}")
                 if existing_id == article_id:
                     found = True
-
     with open(SENT_ARTICLES_FILE, "w") as f:
         f.write("\n".join(valid_lines) + "\n")
-
     return found
 
 def mark_as_sent(article_id):
     with open(SENT_ARTICLES_FILE, "a") as f:
         f.write(f"{article_id} {int(time.time())}\n")
 
+# =============================== #
+# WYSYŁKA DO DISCORDA
+# =============================== #
 def send_to_discord(title, link, summary=None, topic=None):
-    # Sklejamy oryginalny post
     original = f"**{title}**\n{link}\n{summary or ''}"
-
-    # Tekst do tłumaczenia = tytuł + summary
     to_translate = f"{title}\n{summary or ''}"
-
-    # Tłumaczymy
     translated = translate_to_english(to_translate)
-
-    # Dodaj temat jeśli istnieje
     topic_label = f"[**{topic.upper()}**]\n" if topic else ""
-
-    # Sklejamy wiadomość: oryginał + tłumaczenie
     content = (
         f"{topic_label}"
         f"**Oryginał:**\n{original}\n\n"
         f"**🇬🇧 Tłumaczenie:**\n{translated}"
     )
-
     data = {"content": content}
-
     try:
         requests.post(DISCORD_WEBHOOK, json=data)
     except Exception as e:
         print(f"Błąd Discord webhook: {e}")
 
-
-
+# =============================== #
+# GŁÓWNA PĘTLA: pobieranie i filtrowanie
+# =============================== #
 def fetch_and_filter():
     for feed_url in rss_feeds:
         feed = feedparser.parse(feed_url)
@@ -290,14 +296,19 @@ def fetch_and_filter():
             article_id = get_article_id(entry)
             if was_sent(article_id):
                 continue
-
-            if is_relevant(entry):
-                text = f"{entry.title} {entry.get('summary', '')}"
-                topic = classify_topic(text)  # próbujemy przypisać temat
-                if topic:
-                    send_to_discord(entry.title, entry.link, entry.get("summary", ""), topic)
-                    mark_as_sent(article_id)
-
+            # Przygotuj tekst i tagi
+            text = f"{entry.title} {entry.get('summary', '')}".lower()
+            tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
+            source = entry.get("source", {}).get("title", "") or feed_url
+            # FILTRACJA:
+            if not is_relevant(entry):
+                continue
+            if not contains_slavic_country(text, tags, source):
+                continue
+            topic = classify_topic(text)
+            if topic:
+                send_to_discord(entry.title, entry.link, entry.get("summary", ""), topic)
+                mark_as_sent(article_id)
 
 if __name__ == "__main__":
     fetch_and_filter()
