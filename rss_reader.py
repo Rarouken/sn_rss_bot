@@ -9,6 +9,7 @@ from transformers import pipeline
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 from googletrans import Translator as GoogleTranslator
+from urllib.parse import urlparse, urlunparse
 
 # --- Filtry ---
 EXCLUDE_KEYWORDS = [
@@ -37,6 +38,11 @@ IMPORTANT_KEYWORDS = [
 def clean_html(raw_html):
     soup = BeautifulSoup(raw_html, "html.parser")
     return soup.get_text(separator=" ", strip=True)
+
+# --- Normalizacja linku ---
+def normalize_link(link):
+    parsed = urlparse(link)
+    return urlunparse(parsed._replace(query="", fragment=""))
 
 # --- Ładowanie konfiguracji ---
 def load_config(path="config.yaml"):
@@ -124,7 +130,10 @@ ARTICLE_TTL_SECONDS = 3 * 24 * 3600
 SENT_ARTICLES_FILE = "sent_articles.txt"
 
 def get_article_id(entry):
-    unique_string = (clean_html(entry.title) + entry.link).encode("utf-8")
+    # Normalizacja tytułu + oczyszczony link (bez parametrów i fragmentów)
+    title = clean_html(entry.title).lower().strip()
+    link = normalize_link(entry.link)
+    unique_string = (title + link).encode("utf-8")
     return hashlib.md5(unique_string).hexdigest()
 
 def was_sent(article_id):
