@@ -33,7 +33,7 @@ IMPORTANT_KEYWORDS = [
     "wojna", "pokój", "konflikt", "sankcje", "konsulat", "prezydium"
 ]
 
-# --- Usuwanie HTML i zostawianie czystego tekstu ---
+# --- Usuwanie HTML ---
 def clean_html(raw_html):
     soup = BeautifulSoup(raw_html, "html.parser")
     return soup.get_text(separator=" ", strip=True)
@@ -100,7 +100,6 @@ def translate_to_english(text):
     first_line = text.split('\n', 1)[0].strip()
     return f"[Translation failed]\nOriginal headline:\n{first_line}"
 
-# --- ML klasyfikacja ---
 hf_classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 TOPIC_LABELS = [
@@ -111,17 +110,6 @@ TOPIC_LABELS = [
     "security: defense, army, intelligence, terrorism, cyber-security",
     "international relations: summits, treaties, cooperation between Slavic countries, Slavic countries & the world",
 ]
-LABEL_MAP = {
-    "geopolitics": "geopolityka",
-    "international relations": "stosunki międzynarodowe",
-    "foreign policy": "polityka zagraniczna",
-    "security": "bezpieczeństwo",
-    "war": "wojna",
-    "diplomacy": "dyplomacja",
-    "conflicts": "konflikty",
-    "integration": "integracja",
-    "international organizations": "organizacje międzynarodowe"
-}
 
 def classify_topic(text):
     translated = translate_to_english(text)
@@ -132,7 +120,6 @@ def classify_topic(text):
         return None
     return top_label.split(":")[0]
 
-# --- Antyduplikaty ---
 ARTICLE_TTL_SECONDS = 3 * 24 * 3600
 SENT_ARTICLES_FILE = "sent_articles.txt"
 
@@ -175,7 +162,6 @@ def contains_slavic_country(text, tags, source):
         or any(root in source.lower() for root in SLAVIC_COUNTRIES)
     )
 
-# --- Wysyłka do Discorda ---
 def send_to_discord(title, link, summary=None, topic=None):
     title = clean_html(title)
     summary = clean_html(summary or '')
@@ -194,7 +180,6 @@ def send_to_discord(title, link, summary=None, topic=None):
     except Exception as e:
         logger.error(f"Błąd Discord webhook: {e}")
 
-# --- Główna pętla ---
 def fetch_single_feed(feed_url):
     try:
         feed = feedparser.parse(feed_url)
@@ -205,3 +190,74 @@ def fetch_single_feed(feed_url):
 
 def fetch_articles(rss_feeds):
     all_entries = []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_url = {executor.submit(fetch_single_feed, url): url for url in rss_feeds}
+        for future in as_completed(future_to_url):
+            entries = future.result()
+            all_entries.extend(entries)
+    logger.info(f"Pobrano {len(all_entries)} wpisów z {len(rss_feeds)} kanałów (threaded).")
+    return all_entries
+
+def filter_articles(entries):
+    filtered = []
+    for entry in entries:
+        article_id = get_article_id(entry)
+        text = f"{clean_html(entry.title)} {clean_html(entry.get('summary', ''))}".lower()
+        tags = [tag['term'] for tag in entry.get("tags", []) if 'term' in tag]
+        source = entry.get("source", {}).get("title", "") or ""
+
+        if was_sent(article_id):
+            continue
+        if contains_excluded_keyword(entry, EXCLUDE_KEYWORDS):
+            continue
+        if len(entry.title) < 40 and len(entry.get('summary', '')) < 100:
+            continue  # Odrzucamy bardzo krótkie newsy
+        if not contains_slavic_country(text, tags, source):
+            continue
+        if contains_important_keyword(entry, IMPORTANT_KEYWORDS):
+            filtered.append((entry, article_id, True))
+        elif is_obvious_article(entry, SLAVIC_COUNTRIES):
+            filtered.append((entry, article_id, True))
+        else:
+            filtered.append((entry, article_id, False))
+    return filtered
+
+def translate_article(entry):
+    to_translate = f"{clean_html(entry.title)}\n{clean_html(entry.get('summary', ''))}"
+    translated = translate_to_english(to_translate)
+    return translated
+
+def classify_article(translated_text):
+    topic = classify_topic(translated_text)
+    return topic
+
+def send_article(entry, translated, topic, dry_run=False):
+    if dry_run:
+        logger.info(
+            "--- DRY RUN ---\nTytuł: %s\nTłumaczenie: %s\nTemat: %s\n------",
+            entry.title, translated, topic
+        )
+    else:
+        send_to_discord(entry.title, entry.link, entry.get('summary', ''), topic)
+
+def mark_article_sent(article_id):
+    mark_as_sent(article_id)
+
+def main(dry_run=False):
+    entries = fetch_articles(rss_feeds)
+    filtered = filter_articles(entries)
+    for entry, article_id, is_obvious in filtered:
+        if is_obvious:
+            send_article(entry, translate_article(entry), topic=None, dry_run=dry_run)
+        else:
+            translated = translate_article(entry)
+            topic = classify_article(translated)
+            if not topic:
+                logger.info(f"Odrzucone (brak klasyfikacji): {entry.title}")
+                continue
+            send_article(entry, translated, topic, dry_run=dry_run)
+        if not dry_run:
+            mark_article_sent(article_id)
+
+if __name__ == "__main__":
+    main(dry_run=False)
