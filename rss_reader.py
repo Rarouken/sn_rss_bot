@@ -204,4 +204,4 @@ def fetch_single_feed(feed_url):
         return []
 
 def fetch_articles(rss_feeds):
-    all_entries =
+    all_entries = []
